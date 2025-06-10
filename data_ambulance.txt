@@ -1,0 +1,4 @@
+DR001,budi 01,ready,-10,20.11
+DR002,budi 01,ready,-10,20.11
+DR003,budi 01,ready,-10,20.11
+DR004,budi 01,ready,-10,20.11
