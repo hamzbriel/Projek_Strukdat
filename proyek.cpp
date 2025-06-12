@@ -255,7 +255,7 @@ void tambahAmbulance(ptrAmbulance &head, std::string driver, std::string status,
 }
 
 // Menampilkan ambulance
-void traversalAmbulance(ptrAmbulance head)
+void tampilkanAmbulance(ptrAmbulance head)
 {
     loadAllAmbulancesFromFile(head); // Muat data dari file
     if (head == nullptr)
@@ -397,7 +397,7 @@ void tambahPasien(ptrPasien &head, std::string name, std::string location, int p
     std::cout << "Pasien " << name << " ditambahkan.\n";
 }
 
-void traversalPasien(ptrPasien head)
+void tampilkanPasien(ptrPasien head)
 {
     loadAllPasienFromFile(head);
     if (head == nullptr)
@@ -411,7 +411,7 @@ void traversalPasien(ptrPasien head)
         std::cout << "|   ID   |   Nama Pasien   |   Priority   | Tempat Kejadian |     Lokasi     |\n";
         std::cout << "+--------+-----------------+--------------+-----------------+----------------+\n";
 
-        std::string ATS[5] = {"Red", "Orange", "Green", "Blue", "White"};
+        std::string ATS[4] = {"Red", "Yellow", "Green", "Black"};
 
         ptrPasien temp = head;
         while (temp != nullptr)
@@ -476,6 +476,32 @@ void dequeuePasien(Queue &q) {
         
         delete pasienKeluar;
     }
+}
+
+void tampilkanAntrian(Queue q) {
+    if (q.head == nullptr) {
+        std::cout << "Antrian pasien kosong.\n";
+        return;
+    }
+
+    std::cout << "+--------+-----------------+--------------+-----------------+----------------+\n";
+    std::cout << "|   ID   |   Nama Pasien   |   Priority   | Tempat Kejadian |     Lokasi     |\n";
+    std::cout << "+--------+-----------------+--------------+-----------------+----------------+\n";
+
+    std::string ATS[5] = {"Red", "Orange", "Green", "Blue", "White"};
+    ptrPasien current = q.head;
+    
+    while (current != nullptr) {
+        std::string triase = ATS[current->priority - 1];
+        std::cout << "| " << std::setw(6) << current->id << " | "
+                  << std::setw(15) << std::left << current->name << std::right << " | "
+                  << std::setw(12) << std::left << triase << std::right << " | "
+                  << std::setw(15) << std::left << current->location << std::right << " | "
+                  << "(" << std::setw(5) << current->locationX << ", "
+                  << std::setw(5) << std::left << current->locationY << std::right << ") |\n";
+        current = current->next;
+    }
+    std::cout << "+--------+-----------------+--------------+-----------------+----------------+\n";
 }
 
 // ============== AKHIR PASIEN =============
@@ -561,6 +587,38 @@ void loadAllRumahSakitFromFile(ptrRumahSakit &head)
         }
         file.close();
     }
+}
+
+void tampilkanRumahSakit(ptrRumahSakit head) {
+    loadAllRumahSakitFromFile(head);
+    if (head == nullptr) {
+        std::cout << "Daftar rumah sakit kosong.\n";
+        return;
+    }
+
+    std::cout << "+--------+----------------------+----------------+\n";
+    std::cout << "|   ID   |   Nama Rumah Sakit   |     Lokasi     |\n";
+    std::cout << "+--------+----------------------+----------------+\n";
+
+    ptrRumahSakit current = head;
+    while (current != nullptr) {
+        std::cout << "| " << std::setw(6) << current->id << " | "
+                  << std::setw(20) << std::left << current->name << std::right << " | "
+                  << "(" << std::setw(5) << current->locationX << ", "
+                  << std::setw(5) << std::left << current->locationY << std::right << ") |\n";
+        current = current->next;
+    }
+    std::cout << "+--------+----------------------+----------------+\n";
+}
+
+void tambahRumahSakit(ptrRumahSakit &head, std::string name, double x, double y) {
+    std::string rsId = generateRSId();
+    ptrRumahSakit pNew = new RumahSakit{rsId, name, x, y, nullptr};
+
+    // Simpan ke file
+    saveAllRumahSakitToFile(pNew);
+
+    std::cout << "Rumah Sakit " << name << " ditambahkan dengan ID " << rsId << ".\n";
 }
 
 // ============== AKHIR RUMAH SAKIT ==============
@@ -695,28 +753,272 @@ double hitungJarak(double x1, double y1, double x2, double y2)
     return sqrt(pow(x1 - x2, 2) + pow(y1 - y2, 2));
 }
 
+void prosesAmbulance(ptrAmbulance &listAmbulance, ptrRumahSakit listRS, Stack &histori, Queue &antrian) {
+    // Cek apakah ada antrian pasien
+    if (antrian.head == nullptr) {
+        std::cout << "Tidak ada pasien dalam antrian.\n";
+        return;
+    }
+
+    // Cek apakah ada ambulance yang ready
+    ptrAmbulance ambulanceReady = nullptr;
+    ptrAmbulance currentAmbulance = listAmbulance;
+    double minDistance = -1;
+
+    while (currentAmbulance != nullptr) {
+        if (currentAmbulance->status == "Ready") {
+            double distance = hitungJarak(
+                currentAmbulance->locationX, currentAmbulance->locationY,
+                antrian.head->locationX, antrian.head->locationY
+            );
+            
+            if (ambulanceReady == nullptr || distance < minDistance) {
+                ambulanceReady = currentAmbulance;
+                minDistance = distance;
+            }
+        }
+        currentAmbulance = currentAmbulance->next;
+    }
+
+    if (ambulanceReady == nullptr) {
+        std::cout << "Tidak ada ambulance yang siap digunakan.\n";
+        return;
+    }
+
+    // Proses penjemputan
+    ptrPasien pasien = antrian.head;
+    dequeuePasien(antrian);
+
+    // Cari rumah sakit terdekat
+    ptrRumahSakit rsTerdekat = nullptr;
+    ptrRumahSakit currentRS = listRS;
+    double minDistanceRS = -1;
+
+    while (currentRS != nullptr) {
+        double distance = hitungJarak(
+            pasien->locationX, pasien->locationY,
+            currentRS->locationX, currentRS->locationY
+        );
+        
+        if (rsTerdekat == nullptr || distance < minDistanceRS) {
+            rsTerdekat = currentRS;
+            minDistanceRS = distance;
+        }
+        currentRS = currentRS->next;
+    }
+
+    if (rsTerdekat == nullptr) {
+        std::cout << "Tidak ada rumah sakit yang tersedia.\n";
+        return;
+    }
+
+    // Update status ambulance
+    ambulanceReady->status = "On Duty";
+    
+    // Buat transaksi
+    ptrTransaksi transaksi = new Transaksi{
+        pasien->id,
+        pasien->name,
+        ambulanceReady->driverName,
+        "jemput",
+        rsTerdekat->name,
+        nullptr
+    };
+
+    // Push ke histori
+    push(histori, transaksi);
+
+    std::cout << "\n=== PROSES PENJEMPUTAN ===\n";
+    std::cout << "Ambulance: " << ambulanceReady->driverName << " (ID: " << ambulanceReady->id << ")\n";
+    std::cout << "Menjemput pasien: " << pasien->name << "\n";
+    std::cout << "Diantar ke: " << rsTerdekat->name << "\n";
+    std::cout << "Jarak tempuh: " << std::fixed << std::setprecision(2) 
+              << minDistance + minDistanceRS << " km\n";
+
+    // Simpan perubahan status ambulance
+    saveAllAmbulancesToFile(listAmbulance);
+}
+
 // ============== AKHIR OTHER =============
 
-int main()
-{
-    ptrAmbulance listAmbulance;
-    ptrPasien listPasien;
+// ========= MAIN MENU =========
+void mainMenu() {
+    ptrAmbulance listAmbulance = nullptr;
+    ptrPasien listPasien = nullptr;
+    ptrRumahSakit listRS = nullptr;
+    Queue antrianPasien = {nullptr, nullptr};
+    Stack historiTransaksi = {nullptr};
 
-    createListAmbulance(listAmbulance);
-    createListPasien(listPasien);
-    // tambahPasien(listPasien, "Ujang Bedil", "Pudal", 2, 10.1, -12.18);
+    // Load data dari file saat program dimulai
+    loadAllAmbulancesFromFile(listAmbulance);
+    loadAllPasienFromFile(listPasien);
+    loadAllRumahSakitFromFile(listRS);
+    loadAllTransaksiFromFile(historiTransaksi.Top);
 
-    int pil;
-    // while (true)
-    // {
-    //     std::cout << "Masukan pilihan: ";
-    //     std::cin >> pil;
-    //     if (pil == 1)
-    //     {
-    //         tambahAmbulance(listAmbulance, "budi 01", "ready", -10, 20.11);
-    //         // tambahPasien(listPasien, "Ujang Bedil", "Pudal", 2, 10.1, -12.18);
-    //     }
-    // }
-    traversalAmbulance(listAmbulance);
-    // traversalPasien(listPasien);
+    int pilihan;
+    do {
+        std::cout << "\n=== Sistem Manajemen Ambulance ===\n";
+        std::cout << "1. Tambah Ambulance\n";
+        std::cout << "2. Daftar Ambulance\n";
+        std::cout << "3. Tambah Pasien\n";
+        std::cout << "4. Daftar Pasien\n";
+        std::cout << "5. Tambah Rumah Sakit\n";
+        std::cout << "6. Daftar Rumah Sakit\n";
+        std::cout << "7. Masukkan Pasien ke Antrian\n";
+        std::cout << "8. Tampilkan Antrian Pasien\n";
+        std::cout << "9. Proses Penjemputan dan Pengantaran\n";
+        std::cout << "10. Lihat Histori Transaksi\n";
+        std::cout << "0. Keluar\n";
+        std::cout << "Pilih: ";
+        std::cin >> pilihan;
+        std::cin.ignore();
+
+        switch (pilihan) {
+            case 1: {
+                std::string driver, status;
+                double x, y;
+                
+                std::cout << "Nama Driver: ";
+                getline(std::cin, driver);
+                std::cout << "Status (Ready/On Duty/Maintenance): ";
+                getline(std::cin, status);
+                std::cout << "Lokasi X: ";
+                std::cin >> x;
+                std::cout << "Lokasi Y: ";
+                std::cin >> y;
+                
+                tambahAmbulance(listAmbulance, driver, status, x, y);
+                break;
+            }
+            case 2:
+                tampilkanAmbulance(listAmbulance);
+                break;
+            case 3: {
+                std::string name, location;
+                int priority;
+                double x, y;
+                
+                std::cout << "Nama Pasien: ";
+                getline(std::cin, name);
+                std::cout << "Lokasi Kejadian: ";
+                getline(std::cin, location);
+                std::cout << "Prioritas (1-4): ";
+                std::cin >> priority;
+                std::cout << "Lokasi X: ";
+                std::cin >> x;
+                std::cout << "Lokasi Y: ";
+                std::cin >> y;
+                
+                tambahPasien(listPasien, name, location, priority, x, y);
+                break;
+            }
+            case 4:
+                tampilkanPasien(listPasien);
+                break;
+            case 5: {
+                std::string name;
+                double x, y;
+                
+                std::cout << "Nama Rumah Sakit: ";
+                getline(std::cin, name);
+                std::cout << "Lokasi X: ";
+                std::cin >> x;
+                std::cout << "Lokasi Y: ";
+                std::cin >> y;
+                
+                tambahRumahSakit(listRS, name, x, y);
+                break;
+            }
+            case 6:
+                tampilkanRumahSakit(listRS);
+                break;
+            case 7: {
+                if (listPasien == nullptr) {
+                    std::cout << "Tidak ada pasien yang bisa dimasukkan ke antrian.\n";
+                    break;
+                }
+                
+                // Tampilkan daftar pasien
+                tampilkanPasien(listPasien);
+                
+                std::string idPasien;
+                std::cout << "Masukkan ID Pasien yang akan dimasukkan ke antrian: ";
+                std::cin >> idPasien;
+                
+                // Cari pasien
+                ptrPasien p = listPasien;
+                ptrPasien prev = nullptr;
+                while (p != nullptr && p->id != idPasien) {
+                    prev = p;
+                    p = p->next;
+                }
+                
+                if (p == nullptr) {
+                    std::cout << "Pasien dengan ID " << idPasien << " tidak ditemukan.\n";
+                    break;
+                }
+                
+                // Hapus dari list pasien
+                if (prev == nullptr) {
+                    listPasien = p->next;
+                } else {
+                    prev->next = p->next;
+                }
+                
+                // Masukkan ke antrian
+                enqueuePasien(antrianPasien, p);
+                std::cout << "Pasien " << p->name << " dimasukkan ke antrian.\n";
+                
+                // Update file
+                saveAllPasienToFile(listPasien);
+                break;
+            }
+            case 8:
+                tampilkanAntrian(antrianPasien);
+                break;
+            case 9:
+                prosesAmbulance(listAmbulance, listRS, historiTransaksi, antrianPasien);
+                break;
+            case 10:
+                tampilkanHistori(historiTransaksi);
+                break;
+            case 0:
+                std::cout << "Keluar dari program.\n";
+                break;
+            default:
+                std::cout << "Pilihan tidak valid.\n";
+        }
+    } while (pilihan != 0);
+
+    // Bersihkan memori sebelum keluar
+    while (listAmbulance != nullptr) {
+        ptrAmbulance temp = listAmbulance;
+        listAmbulance = listAmbulance->next;
+        delete temp;
+    }
+    while (listPasien != nullptr) {
+        ptrPasien temp = listPasien;
+        listPasien = listPasien->next;
+        delete temp;
+    }
+    while (listRS != nullptr) {
+        ptrRumahSakit temp = listRS;
+        listRS = listRS->next;
+        delete temp;
+    }
+    while (historiTransaksi.Top != nullptr) {
+        ptrTransaksi temp = historiTransaksi.Top;
+        historiTransaksi.Top = historiTransaksi.Top->next;
+        delete temp;
+    }
+    while (antrianPasien.head != nullptr) {
+        ptrPasien temp = antrianPasien.head;
+        antrianPasien.head = antrianPasien.head->next;
+        delete temp;
+    }
+}
+
+int main() {
+    mainMenu();
+    return 0;
 }
