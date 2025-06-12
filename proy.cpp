@@ -16,6 +16,8 @@ std::string DATA_AMBULANCE = "data_ambulance.txt";
 std::string DATA_PASIEN = "data_pasien.txt";
 // File untuk menyimpan data Ambulance
 std::string DATA_RS = "data_RS.txt";
+// File untuk menyimpan data Transaksi
+std::string DATA_TRANSAKSI = "data_transaksi.txt";
 
 // FUNGSI AUTO_INCREMENT
 // Baca counter dari file
@@ -118,13 +120,15 @@ typedef RumahSakit *ptrRumahSakit;
 // Struktur Transaksi
 struct Transaksi
 {
-    int pasienId;
+    std::string pasienId;
     std::string pasienName;
     std::string ambulanceDriver;
     std::string action;   // "jemput" atau "antar"
     std::string keLokasi; // lokasi tujuan
     Transaksi *next;      // linked list
 };
+
+typedef Transaksi *ptrTransaksi;
 
 // Queue untuk antrean pasien
 struct Queue
@@ -282,6 +286,24 @@ void traversalAmbulance(ptrAmbulance head)
 // =========== AWAL PASIEN ============
 Queue antrianPasien = {nullptr, nullptr}; // Inisialisasi queue kosong
 
+// insertLast Pasien
+void insertPS(ptrPasien &head, ptrPasien pNew)
+{
+    if (head == nullptr)
+    {
+        head = pNew;
+    }
+    else
+    {
+        ptrPasien temp = head;
+        while (temp->next != nullptr)
+        {
+            temp = temp->next;
+        }
+        temp->next = pNew;
+    }
+}
+
 // Fungsi untuk menyimpan semua ambulance ke file
 void saveAllPasienToFile(ptrPasien head)
 {
@@ -354,19 +376,7 @@ void loadAllPasienFromFile(ptrPasien &head)
             ptrPasien pNew = new Pasien{psn.id, psn.name, psn.location, psn.priority,
                                         psn.locationX, psn.locationY, nullptr};
 
-            if (head == nullptr)
-            {
-                head = pNew;
-            }
-            else
-            {
-                ptrPasien temp = head;
-                while (temp->next != nullptr)
-                {
-                    temp = temp->next;
-                }
-                temp->next = pNew;
-            }
+            insertPS(head, pNew);
         }
         file.close();
     }
@@ -403,7 +413,7 @@ void traversalPasien(ptrPasien head)
         std::cout << "|   ID   |   Nama Pasien   |   Priority   | Tempat Kejadian |     Lokasi     |\n";
         std::cout << "+--------+-----------------+--------------+-----------------+----------------+\n";
 
-        std::string ATS[5] = {"Red", "Orange", "Green", "Blue", "White"};
+        std::string ATS[4] = {"Red", "Yellow", "Green", "Black"};
 
         ptrPasien temp = head;
         while (temp != nullptr)
@@ -422,9 +432,91 @@ void traversalPasien(ptrPasien head)
         std::cout << "+--------+-----------------+--------------+-----------------+----------------+\n";
     }
 }
+
+void enqueuePasien(Queue &q, ptrPasien pasienBaru)
+{
+    if (q.head == nullptr && q.tail == nullptr)
+    {
+        q.head = pasienBaru;
+        q.tail = pasienBaru;
+    }
+    else
+    {
+        ptrPasien current = q.head;
+        ptrPasien prev = nullptr;
+
+        while (current != nullptr && current->priority <= pasienBaru->priority)
+        {
+            prev = current;
+            current = current->next;
+        }
+
+        if (prev == nullptr)
+        {
+            // Masukkan di depan (prioritas tertinggi)
+            pasienBaru->next = q.head;
+            q.head = pasienBaru;
+        }
+        else if (current == nullptr)
+        {
+            // Masukkan di belakang (prioritas terendah)
+            q.tail->next = pasienBaru;
+            q.tail = pasienBaru;
+        }
+        else
+        {
+            // Masukkan di tengah
+            prev->next = pasienBaru;
+            pasienBaru->next = current;
+        }
+    }
+    std::cout << "Pasien " << pasienBaru->name << " dimasukkan ke antrian.\n";
+}
+
+ptrPasien dequeuePasien(Queue &q)
+{
+    ptrPasien pasien = nullptr;
+
+    if (q.head == nullptr && q.tail == nullptr)
+    {
+        std::cout << "Antrian kosong, tidak ada pasien yang bisa diproses.\n";
+    }
+    else
+    {
+        pasien = q.head;
+        q.head = q.head->next;
+
+        if (q.head == nullptr)
+        {
+            q.tail = nullptr;
+        }
+        pasien->next = nullptr;
+        std::cout << "Pasien " << pasien->name << " dikeluarkan dari antrian.\n";
+    }
+    return pasien;
+}
 // ============== AKHIR PASIEN =============
 
 // ============== RUMAH SAKIT ==============
+
+// Insert Last RS
+void insertRS(ptrRumahSakit &head, ptrRumahSakit pNew)
+{
+    if (head == nullptr)
+    {
+        head = pNew;
+    }
+    else
+    {
+        ptrRumahSakit temp = head;
+        while (temp->next != nullptr)
+        {
+            temp = temp->next;
+        }
+        temp->next = pNew;
+    }
+}
+
 // Fungsi untuk menyimpan semua RS ke file
 void saveAllRumahSakitToFile(ptrRumahSakit head)
 {
@@ -487,7 +579,127 @@ void loadAllRumahSakitFromFile(ptrRumahSakit &head)
             rs.locationY = std::stod(token);
 
             // Tambahkan ke linked list
+
+            // create elemen
             ptrRumahSakit pNew = new RumahSakit{rs.id, rs.name, rs.locationX, rs.locationY, nullptr};
+
+            insertRS(head, pNew);
+        }
+        file.close();
+    }
+}
+
+void createListRS(ptrRumahSakit &head)
+{
+    head = nullptr;
+}
+
+// Menambahkan rumah sakit
+void tambahRS(ptrRumahSakit &head, std::string name, double x, double y)
+{
+    std::string RSId = generateRSId();
+    ptrRumahSakit pNew = new RumahSakit{RSId, name, x, y, nullptr};
+
+    // Simpan ke file
+    saveAllRumahSakitToFile(pNew);
+
+    std::cout << "Rumah sakit: " << name << " ditambahkan.\n";
+}
+
+void traversalRS(ptrRumahSakit head)
+{
+    loadAllRumahSakitFromFile(head);
+    if (head == nullptr)
+    {
+        std::cout << "Daftar pasien kosong.\n";
+    }
+    else
+    {
+        // Header tabel
+        std::cout << "+--------+-----------------+----------------+\n";
+        std::cout << "|   ID   |      Nama       |     Lokasi     |\n";
+        std::cout << "+--------+-----------------+----------------+\n";
+
+        ptrRumahSakit temp = head;
+        while (temp != nullptr)
+        {
+            std::cout << "| " << std::setw(6) << temp->id << " | "
+                      << std::setw(15) << std::left << temp->name << std::right << " | "
+                      << "(" << std::setw(5) << temp->locationX << ", "
+                      << std::setw(5) << std::left << temp->locationY << std::right << ") |\n";
+            temp = temp->next;
+        }
+        std::cout << "+--------+-----------------+----------------+\n";
+    }
+}
+
+// ============== AKHIR RUMAH SAKIT ==============
+
+// =========== AWAL TRANSAKSI ============
+
+void saveAllTransaksiToFile(ptrTransaksi head)
+{
+    std::ofstream file(DATA_TRANSAKSI, std::ios::app);
+    if (!file)
+    {
+        std::cout << "Gagal membuka file untuk penyimpanan!\n";
+    }
+    else
+    {
+        ptrTransaksi current = head;
+        while (current != nullptr)
+        {
+            file << current->pasienId << ","
+                 << current->pasienName << ","
+                 << current->ambulanceDriver << ","
+                 << current->action << ","
+                 << current->keLokasi << "\n";
+            current = current->next;
+        }
+        file.close();
+    }
+}
+
+void loadAllTransaksiFromFile(ptrTransaksi &head)
+{
+    std::ifstream file(DATA_TRANSAKSI);
+    if (!file)
+    {
+        std::cout << "File data pasien belum ada atau kosong.\n";
+    }
+    else
+    {
+        while (head != nullptr)
+        {
+            ptrTransaksi temp = head;
+            head = head->next;
+            delete temp;
+        }
+
+        std::string line;
+        while (std::getline(file, line))
+        {
+            std::stringstream ss(line);
+            std::string token;
+            Transaksi trx;
+
+            std::getline(ss, token, ',');
+            trx.pasienId = token;
+
+            std::getline(ss, token, ',');
+            trx.pasienName = token;
+
+            std::getline(ss, token, ',');
+            trx.ambulanceDriver = token;
+
+            std::getline(ss, token, ',');
+            trx.action = token;
+
+            std::getline(ss, token, ',');
+            trx.keLokasi = token;
+
+            ptrTransaksi pNew = new Transaksi{trx.pasienId, trx.pasienName, trx.ambulanceDriver,
+                                              trx.action, trx.keLokasi, nullptr};
 
             if (head == nullptr)
             {
@@ -495,7 +707,7 @@ void loadAllRumahSakitFromFile(ptrRumahSakit &head)
             }
             else
             {
-                ptrRumahSakit temp = head;
+                ptrTransaksi temp = head;
                 while (temp->next != nullptr)
                 {
                     temp = temp->next;
@@ -507,7 +719,66 @@ void loadAllRumahSakitFromFile(ptrRumahSakit &head)
     }
 }
 
-// ============== AKHIR RUMAH SAKIT ==============
+void push(Stack &s, ptrTransaksi t)
+{
+    t->next = s.Top;
+    s.Top = t;
+    saveAllTransaksiToFile(s.Top);
+}
+
+void pop(Stack &s, ptrTransaksi &transaksi)
+{
+    if (s.Top == nullptr)
+    {
+        transaksi = nullptr;
+    }
+    else
+    {
+        transaksi = s.Top;
+        s.Top = s.Top->next;
+        transaksi->next = nullptr;
+        saveAllTransaksiToFile(s.Top);
+    }
+}
+
+void tampilkanHistori(Stack &histori)
+{
+    loadAllTransaksiFromFile(histori.Top);
+    if (histori.Top == nullptr)
+    {
+        std::cout << "Histori transaksi kosong.\n";
+    }
+    else
+    {
+        std::cout << "+--------+-----------------+----------------+-----------+----------------------+\n";
+        std::cout << "| ID PS  |   Nama Pasien   | Nama Driver    |  Aksi     | Tujuan               |\n";
+        std::cout << "+--------+-----------------+----------------+-----------+----------------------+\n";
+
+        Stack tempStack = {nullptr};
+        ptrTransaksi t;
+        while (histori.Top != nullptr)
+        {
+            pop(histori, t);
+            std::cout << "| " << std::setw(6) << t->pasienId << " | "
+                      << std::setw(15) << std::left << t->pasienName << std::right << " | "
+                      << std::setw(14) << std::left << t->ambulanceDriver << std::right << " | "
+                      << std::setw(9) << std::left << t->action << std::right << " | "
+                      << std::setw(20) << std::left << t->keLokasi << std::right << " |\n";
+            push(tempStack, t);
+        }
+
+        // Kembalikan ke stack asli
+        while (tempStack.Top != nullptr)
+        {
+            pop(tempStack, t);
+            push(histori, t);
+        }
+
+        std::cout << "+--------+-----------------+----------------+-----------+----------------------+\n";
+    }
+}
+
+// =========== AKHIR TRANSAKSI ============
 
 // ============== OTHER ==============
 
@@ -515,6 +786,88 @@ void loadAllRumahSakitFromFile(ptrRumahSakit &head)
 double hitungJarak(double x1, double y1, double x2, double y2)
 {
     return sqrt(pow(x1 - x2, 2) + pow(y1 - y2, 2));
+}
+
+// Mencari rumah sakit terdekat
+ptrRumahSakit cariRumahSakitTerdekat(ptrRumahSakit head, double x, double y)
+{
+    ptrRumahSakit terdekat = nullptr;
+    double jarakMin = -1;
+    ptrRumahSakit temp = head;
+    while (temp != nullptr)
+    {
+        double jarak = hitungJarak(x, y, temp->locationX, temp->locationY);
+        if (jarakMin < 0 || jarak < jarakMin)
+        {
+            jarakMin = jarak; // update jarakMin
+            terdekat = temp;  // simpa pointernya
+        }
+        temp = temp->next;
+    }
+    return terdekat;
+}
+
+// Mencari ambulan terdekat
+ptrAmbulance cariAmbulanceTerdekat(ptrAmbulance head, double x, double y)
+{
+    ptrAmbulance terdekat = nullptr;
+    double jarakMin = -1;
+    ptrAmbulance temp = head;
+    while (temp != nullptr)
+    {
+        double jarak = hitungJarak(x, y, temp->locationX, temp->locationY);
+        if (jarakMin < 0 || (jarak < jarakMin && temp->status == "Ready"))
+        {
+            jarakMin = jarak; // update jarakMin
+            terdekat = temp;  // simpa pointernya
+        }
+        temp = temp->next;
+    }
+    return terdekat;
+}
+
+// // Proses penjemputan dan pengantaran
+void prosesAmbulance(ptrAmbulance &ambulansList, ptrRumahSakit rsList, Stack &histori, Queue &antrianPasien)
+{
+    if (antrianPasien.head == nullptr)
+    {
+        std::cout << "Antrean kosong.\n";
+        return;
+    }
+
+    ptrPasien pasien = dequeuePasien(antrianPasien);
+
+    // Tentukan ambulance terdekat
+    ptrAmbulance ambTerdekat = cariAmbulanceTerdekat(ambulansList, pasien->locationX, pasien->locationY);
+    if (ambTerdekat == nullptr)
+    {
+        std::cout << "Tidak ada ambulance siap.\n";
+        return;
+    }
+
+    // Tentukan rumah sakit terdekat
+    ptrRumahSakit RSTerdekat = cariRumahSakitTerdekat(rsList, pasien->locationX, pasien->locationY);
+    if (RSTerdekat == nullptr)
+    {
+        std::cout << "Tidak ada rumah sakit yang terdaftar.\n";
+        // Kembalikan pasien ke antrian (enqueue)
+        enqueuePasien(antrianPasien, pasien);
+        return;
+    }
+    else
+    {
+        // Rumah sakit ditemukan
+
+        // update posisi ambulance
+        ambTerdekat->locationX = RSTerdekat->locationX;
+        ambTerdekat->locationY = RSTerdekat->locationY;
+    }
+
+    // Proses penjemputan
+    std::cout << "Ambulance ID " << ambTerdekat->id << " menjemput pasien " << pasien->name
+              << " di lokasi " << pasien->location << "\n ";
+
+    // catat transaksi pengantaran
 }
 
 // ============== AKHIR OTHER =============
